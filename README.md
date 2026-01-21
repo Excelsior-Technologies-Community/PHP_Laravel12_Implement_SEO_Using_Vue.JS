@@ -395,15 +395,19 @@ php artisan serve
 npm run dev
 ```
 # http://localhost:8000/products
- <img width="1393" height="593" alt="image" src="https://github.com/user-attachments/assets/ccf1eb18-dca5-4d49-a40e-813aa5460079" />
+<img width="1631" height="556" alt="image" src="https://github.com/user-attachments/assets/7068ad36-44b1-425b-a6b5-20c8abc9ede6" />
 
- <img width="1121" height="319" alt="image" src="https://github.com/user-attachments/assets/6c0c3ff8-7480-465f-a4aa-5288d87d47fd" />
+
+ <img width="1121" height="319" alt="image" src="https://github.com/user-attachments/assets/1a9ffc2b-7cde-484e-a6a3-f45785ad0f15" />
+
 
 # http://127.0.0.1:8000/customer/products
-<img width="1631" height="556" alt="image" src="https://github.com/user-attachments/assets/0eb4bae0-78c2-47e9-91d2-a0fbe0c56f35" />
+<img width="1679" height="721" alt="image" src="https://github.com/user-attachments/assets/986b2371-57fe-4f9d-a973-e1b0e04efa44" />
+
 
  
 # Now Click Any One products view button then show product details  and after right click and select  view page source then  selected  product  to show SEO and OG details in view page sorce..
- <img width="1679" height="721" alt="image" src="https://github.com/user-attachments/assets/c73e4e27-cfe6-4b96-a99d-2aace53e427c" />
+<img width="1393" height="593" alt="image" src="https://github.com/user-attachments/assets/7885afa3-8f8f-4e63-b22c-725646da60b4" />
+
 
 
