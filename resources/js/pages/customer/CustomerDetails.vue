@@ -1,16 +1,43 @@
 <template>
-  <div class="container mt-4">
-
+  <div class="container mt-4" v-if="product">
     <button class="btn btn-secondary mb-3" @click="$router.back()">Back</button>
 
-    <div class="row">
-
+    <div class="row g-4">
       <div class="col-md-5">
-        <img 
-          v-if="product.image"
-          :src="'/product_images/' + product.image"
-          class="img-fluid rounded shadow-sm"
-        >
+
+        <div v-if="product.image_url" class="mb-3 text-center">
+          <img
+            :src="product.image_url"
+            :alt="product.alt_text || product.name"
+            class="img-fluid rounded shadow-sm"
+            loading="lazy"
+            width="400"
+            height="400"
+          >
+        </div>
+
+        <div class="row g-2">
+          <div class="col-6">
+            <img
+              v-if="product.seo_image_url"
+              :src="product.seo_image_url"
+              :alt="product.seo_image_alt || product.alt_text || product.name"
+              class="img-fluid rounded"
+              loading="lazy"
+            >
+            <small class="text-muted d-block mt-1">SEO Image</small>
+          </div>
+          <div class="col-6">
+            <img
+              v-if="product.og_image_url"
+              :src="product.og_image_url"
+              :alt="product.og_image_alt || product.alt_text || product.name"
+              class="img-fluid rounded"
+              loading="lazy"
+            >
+            <small class="text-muted d-block mt-1">OG Image</small>
+          </div>
+        </div>
       </div>
 
       <div class="col-md-7">
@@ -19,70 +46,94 @@
         <p><strong>Size:</strong> {{ product.size }}</p>
         <p><strong>Price:</strong> ₹{{ product.price }}</p>
 
-        <!-- ❗ NO SEO fields shown here -->
-      </div>
+        <div v-if="product.seo_meta_description" class="border-start border-primary ps-3 mb-3">
+          <p class="mb-0 text-muted fst-italic">{{ product.seo_meta_description }}</p>
+        </div>
 
+        <router-link
+          v-if="product.slug"
+          :to="`/customer/products/` + product.id"
+          class="btn btn-outline-primary btn-sm"
+        >
+          Shareable link
+        </router-link>
+      </div>
     </div>
+
+    <div v-if="product.product_url" class="alert alert-info mt-3 mb-0">
+      Canonical: {{ product.product_url }}
+    </div>
+  </div>
+
+  <div v-else class="container mt-4">
+    <p>Loading product…</p>
   </div>
 </template>
 
 <script>
 export default {
-  props: ["id"],
+  props: {
+    id: { type: [String, Number], required: true },
+  },
 
   data() {
-    return { product: {} }
+    return {
+      product: null,
+    };
   },
 
   methods: {
-    addMetaTags() {
-      // Clear previous meta tags (optional)
-      document.querySelectorAll('meta[data-dynamic="true"]').forEach(m => m.remove());
+    applyMeta(product) {
+      document.querySelectorAll('meta[data-dynamic="true"]').forEach((m) => m.remove());
+      document.querySelectorAll('link[data-dynamic="true"]').forEach((l) => l.remove());
 
-      // Function to add meta
-      const addMeta = (attr, content) => {
-        if (content) {
-          let m = document.createElement('meta');
-          m.setAttribute(attr.type, attr.name);
-          m.setAttribute('content', content);
-          m.setAttribute('data-dynamic', 'true');
-          document.head.appendChild(m);
-        }
+      const setMeta = (type, name, content) => {
+        if (!content) return;
+        const m = document.createElement('meta');
+        m.setAttribute(type, name);
+        m.setAttribute('content', content);
+        m.setAttribute('data-dynamic', 'true');
+        document.head.appendChild(m);
       };
 
-      // SEO TAGS
-      addMeta({ type: 'name', name: 'description' }, this.product.seo_meta_description);
-      addMeta({ type: 'name', name: 'keywords' }, this.product.seo_meta_keywords);
-      addMeta({ type: 'name', name: 'title' }, this.product.seo_meta_title);
-
-      // OG TAGS
-      addMeta({ type: 'property', name: 'og:title' }, this.product.og_meta_title);
-      addMeta({ type: 'property', name: 'og:description' }, this.product.og_meta_description);
-      addMeta({ type: 'property', name: 'og:image' }, '/product_images/' + this.product.og_image);
-
-      // Canonical
-      if (this.product.seo_canonical) {
-        let link = document.createElement('link');
+      if (product.seo_meta_title) {
+        document.title = product.seo_meta_title;
+      }
+      setMeta('name', 'description', product.seo_meta_description);
+      setMeta('name', 'keywords', product.seo_meta_keywords);
+      setMeta('property', 'og:title', product.og_meta_title || product.seo_meta_title);
+      setMeta('property', 'og:description', product.og_meta_description);
+      if (product.og_image_url) {
+        setMeta('property', 'og:image', product.og_image_url);
+      }
+      if (product.seo_canonical) {
+        const link = document.createElement('link');
         link.setAttribute('rel', 'canonical');
-        link.setAttribute('href', this.product.seo_canonical);
+        link.setAttribute('href', product.seo_canonical);
         link.setAttribute('data-dynamic', 'true');
         document.head.appendChild(link);
       }
-
-      // Update <title>
-      if (this.product.seo_meta_title) {
-        document.title = this.product.seo_meta_title;
-      }
-    }
+    },
   },
 
   mounted() {
-    fetch('/product-data/' + this.id)
-      .then(res => res.json())
-      .then(data => {
+    fetch(`/product-data/${this.id}`)
+      .then((res) => res.json())
+      .then((data) => {
         this.product = data;
-        this.addMetaTags();   // 🔥 Important: SEO tags added to HEAD
+        this.applyMeta(this.product);
       });
-  }
-}
+  },
+
+  watch: {
+    '$route.params.id'(id) {
+      fetch(`/product-data/${id}`)
+        .then((res) => res.json())
+        .then((data) => {
+          this.product = data;
+          this.applyMeta(this.product);
+        });
+    },
+  },
+};
 </script>

@@ -20,7 +20,7 @@
           <td>{{ p.name }}</td>
 
           <td>
-            <img v-if="p.image" :src="'/product_images/' + p.image" width="60">
+            <img v-if="p.image_url" :src="p.image_url" :alt="p.alt_text || p.name" width="60" loading="lazy">
           </td>
 
           <td>{{ p.size }}</td>
