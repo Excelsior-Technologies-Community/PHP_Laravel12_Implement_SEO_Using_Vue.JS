@@ -1,71 +1,57 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ProductController;
-use App\Models\Product;
+use App\Http\Controllers\SitemapController;
+use Illuminate\Support\Facades\Route;
+
+Route::get('/', function () {
+    return view('welcome');
+});
 
 // =====================================================================
-// ADMIN (VUE) PAGES — EMPTY SEO
+// SEO-CRAWLED CUSTOMER PAGES (SERVER-SIDE RENDERED META)
 // =====================================================================
-Route::get('/products', function () {
-    $seo = [];
-    return view('app', compact('seo'));
+Route::get('/customer/products', [ProductController::class, 'index'])->name('products.index');
+Route::get('/customer/products/{id}', [ProductController::class, 'show'])->name('customer.product');
+
+// Friendly slug-based URL (canonical target, SEO)
+Route::get('/product/{slug}', [ProductController::class, 'showBySlug'])->name('product.show');
+
+// =====================================================================
+// DYNAMIC robots.txt
+// =====================================================================
+Route::get('/robots.txt', function () {
+    $content = "User-agent: *\n";
+    $content .= "Allow: /\n";
+    $content .= "Disallow: /products/create\n";
+    $content .= "Disallow: /products/edit\n";
+    $content .= "Sitemap: " . url('/sitemap.xml') . "\n";
+
+    return response($content, 200)->header('Content-Type', 'text/plain; charset=UTF-8');
 });
 
-Route::get('/products/create', function () {
-    $seo = [];
-    return view('app', compact('seo'));
-});
+// =====================================================================
+// SITEMAP
+// =====================================================================
+Route::get('/sitemap.xml', SitemapController::class)->name('sitemap');
 
-Route::get('/products/edit/{id}', function () {
-    $seo = [];
-    return view('app', compact('seo'));
-});
+// =====================================================================
+// ADMIN (VUE) PAGES
+// =====================================================================
+Route::get('/products', [ProductController::class, 'index'])->name('admin.products');
+Route::get('/products/create', fn() => view('app', ['seo' => []]))->name('products.create');
+Route::get('/products/edit/{id}', fn($id) => view('app', ['seo' => []]))->name('products.edit');
 
 // =====================================================================
 // FORM SUBMIT ROUTES
 // =====================================================================
-Route::post('/products/store', [ProductController::class, 'store']);
-Route::post('/products/update/{id}', [ProductController::class, 'update']);
-Route::get('/products/delete/{id}', [ProductController::class, 'delete']);
+Route::post('/products/store', [ProductController::class, 'store'])->name('products.store');
+Route::post('/products/update/{id}', [ProductController::class, 'update'])->name('products.update');
+Route::delete('/products/{id}', [ProductController::class, 'destroy'])->name('products.destroy');
+Route::get('/products/delete/{id}', [ProductController::class, 'destroy'])->name('products.delete');
 
 // =====================================================================
 // DATA ROUTES (JSON ONLY)
 // =====================================================================
-Route::get('/products-data', fn() => Product::all());
-Route::get('/product-data/{id}', fn($id) => Product::find($id));
-
-// =====================================================================
-// CUSTOMER (VUE) PAGES — EMPTY SEO
-// =====================================================================
-Route::get('/customer/products', function () {
-    $seo = [];
-    return view('app', compact('seo'));
-});
-
-// =====================================================================
-// CUSTOMER PRODUCT DETAILS (SEO INCLUDED)
-// =====================================================================
-Route::get('/customer/products/{id}', function ($id) {
-
-    $product = Product::find($id);
-
-    $seo = [
-        'title' => $product->seo_meta_title,
-        'description' => $product->seo_meta_description,
-        'keywords' => $product->seo_meta_keywords,
-        'canonical' => $product->seo_canonical,
-        'og_title' => $product->og_meta_title,
-        'og_description' => $product->og_meta_description,
-        'og_image' => asset('product_images/' . $product->og_image),
-    ];
-
-    return view('app', compact('seo'));
-});
-
-// =====================================================================
-// DEFAULT PAGE
-// =====================================================================
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::get('/products-data', [ProductController::class, 'jsonIndex']);
+Route::get('/product-data/{id}', [ProductController::class, 'jsonShow']);

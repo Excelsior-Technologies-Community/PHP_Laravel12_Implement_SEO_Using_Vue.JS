@@ -7,10 +7,13 @@
       <div class="col-md-4 mb-4" v-for="p in products" :key="p.id">
         <div class="card shadow-sm">
 
-          <img 
-            v-if="p.image"
-            :src="'/product_images/' + p.image"
+          <img
+            v-if="p.image_url"
+            :src="p.image_url"
+            :alt="p.alt_text || p.name"
             class="card-img-top"
+            loading="lazy"
+            width="300"
             height="230"
           >
 

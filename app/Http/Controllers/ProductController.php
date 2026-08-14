@@ -2,113 +2,184 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreProductRequest;
+use App\Http\Requests\UpdateProductRequest;
 use App\Models\Product;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class ProductController extends Controller
 {
-    // ---------------------------
-    // STORE (CREATE PRODUCT)
-    // ---------------------------
-    public function store(Request $request)
+    public function index()
     {
-        // MAIN IMAGE
-        $imageName = null;
-        if ($request->hasFile('image')) {
-            $imageName = time() . '_main.' . $request->image->extension();
-            $request->image->move(public_path('product_images'), $imageName);
+        if (request()->wantsJson()) {
+            return response()->json(Product::latest()->get());
         }
 
-        // SEO IMAGE
-        $seoImage = null;
-        if ($request->hasFile('seo_image')) {
-            $seoImage = time() . '_seo.' . $request->seo_image->extension();
-            $request->seo_image->move(public_path('product_images'), $seoImage);
-        }
+        $seoService = app(\App\Services\SeoService::class);
+        $seo = $seoService->forPage(
+            config('seo.site_name', 'Laravel'),
+            config('seo.defaults.title', 'Online Shop'),
+            config('seo.defaults.description', 'Best products online at the best prices.'),
+            request()->fullUrl()
+        );
 
-        // OG IMAGE
-        $ogImage = null;
-        if ($request->hasFile('og_image')) {
-            $ogImage = time() . '_og.' . $request->og_image->extension();
-            $request->og_image->move(public_path('product_images'), $ogImage);
-        }
-
-        // SAVE PRODUCT
-        Product::create([
-            'name'  => $request->name,
-            'size'  => $request->size,
-            'price' => $request->price,
-            'image' => $imageName,
-
-            // SEO / OG FIELDS
-            'seo_image'            => $seoImage,
-            'og_image'             => $ogImage,
-            'seo_meta_title'       => $request->seo_meta_title,
-            'og_meta_title'        => $request->og_meta_title,
-            'seo_meta_keywords'    => $request->seo_meta_keywords,
-            'og_meta_keywords'     => $request->og_meta_keywords,
-            'seo_meta_description' => $request->seo_meta_description,
-            'og_meta_description'  => $request->og_meta_description,
-            'seo_canonical'        => $request->seo_canonical,
+        return view('app', [
+            'seo' => $seo,
+            'structuredData' => $this->siteStructuredData(),
         ]);
-
-        return redirect('/products');
     }
 
-    // ---------------------------
-    // UPDATE PRODUCT
-    // ---------------------------
-    public function update(Request $request, $id)
+    public function showBySlug(Request $request, $slug)
     {
-        $product = Product::find($id);
-
-        // MAIN IMAGE
-        if ($request->hasFile('image')) {
-            $imageName = time() . '_main.' . $request->image->extension();
-            $request->image->move(public_path('product_images'), $imageName);
-            $product->image = $imageName;
-        }
-
-        // SEO IMAGE
-        if ($request->hasFile('seo_image')) {
-            $seoImage = time() . '_seo.' . $request->seo_image->extension();
-            $request->seo_image->move(public_path('product_images'), $seoImage);
-            $product->seo_image = $seoImage;
-        }
-
-        // OG IMAGE
-        if ($request->hasFile('og_image')) {
-            $ogImage = time() . '_og.' . $request->og_image->extension();
-            $request->og_image->move(public_path('product_images'), $ogImage);
-            $product->og_image = $ogImage;
-        }
-
-        // TEXT FIELDS UPDATE
-        $product->name  = $request->name;
-        $product->size  = $request->size;
-        $product->price = $request->price;
-
-        // SEO FIELDS UPDATE
-        $product->seo_meta_title       = $request->seo_meta_title;
-        $product->og_meta_title        = $request->og_meta_title;
-        $product->seo_meta_keywords    = $request->seo_meta_keywords;
-        $product->og_meta_keywords     = $request->og_meta_keywords;
-        $product->seo_meta_description = $request->seo_meta_description;
-        $product->og_meta_description  = $request->og_meta_description;
-        $product->seo_canonical        = $request->seo_canonical;
-
-        // SAVE
-        $product->save();
-
-        return redirect('/products');
+        $product = Product::where('slug', $slug)->firstOrFail();
+        return $this->show($request, $product->id);
     }
 
-    // ---------------------------
-    // DELETE PRODUCT
-    // ---------------------------
-    public function delete($id)
+    public function jsonIndex()
     {
-        Product::find($id)->delete();
-        return redirect('/products');
+        return response()->json(Product::all());
+    }
+
+    public function jsonShow($id)
+    {
+        $product = Product::findOrFail($id);
+        return response()->json($product);
+    }
+
+    public function show(Request $request, $id)
+    {
+        $product = Product::findOrFail($id);
+
+        if (request()->wantsJson()) {
+            return response()->json($product);
+        }
+
+        $seoService = app(\App\Services\SeoService::class);
+        $meta = $seoService->forProduct($product, $request->fullUrl());
+
+        return view('app', [
+            'seo' => $meta,
+            'structuredData' => $this->structuredData($product),
+            'product' => $product,
+        ]);
+    }
+
+    public function store(StoreProductRequest $request)
+    {
+        $data = $request->validated();
+
+        $data['image'] = $this->handleUpload($request, 'image', $data['image'] ?? null);
+        $data['seo_image'] = $this->handleUpload($request, 'seo_image', $request->input('seo_image'));
+        $data['og_image'] = $this->handleUpload($request, 'og_image', $request->input('og_image'));
+
+        $product = Product::create($data);
+
+        if ($request->wantsJson()) {
+            return response()->json($product, 201);
+        }
+
+        return redirect('/products')->with('success', 'Product created successfully.');
+    }
+
+    public function update(UpdateProductRequest $request, $id)
+    {
+        $product = Product::findOrFail($id);
+        $data = $request->validated();
+
+        $data['image'] = $this->handleUpload($request, 'image', $request->input('image'));
+        $data['seo_image'] = $this->handleUpload($request, 'seo_image', $request->input('seo_image'));
+        $data['og_image'] = $this->handleUpload($request, 'og_image', $request->input('og_image'));
+
+        $product->fill($data)->save();
+
+        if ($request->wantsJson()) {
+            return response()->json($product);
+        }
+
+        return redirect('/products')->with('success', 'Product updated successfully.');
+    }
+
+    public function destroy(Request $request, $id)
+    {
+        $product = Product::findOrFail($id);
+        $this->deleteImages($product);
+        $product->delete();
+
+        if ($request->wantsJson()) {
+            return response()->json(null, 204);
+        }
+
+        return redirect('/products')->with('success', 'Product deleted successfully.');
+    }
+
+    protected function handleUpload(Request $request, string $field, $existing): ?string
+    {
+        if ($request->hasFile($field)) {
+            $this->deleteFile($existing);
+
+            $file = $request->file($field);
+            $name = time() . '_' . Str::random(6) . '_' . $field . '.' . $file->getClientOriginalExtension();
+            $file->move(public_path('product_images'), $name);
+
+            return $name;
+        }
+
+        return $existing;
+    }
+
+    protected function deleteFile($filename): void
+    {
+        if ($filename) {
+            $path = public_path('product_images') . '/' . $filename;
+            if (is_file($path)) {
+                @unlink($path);
+            }
+        }
+    }
+
+    protected function deleteImages(Product $product): void
+    {
+        foreach (['image', 'seo_image', 'og_image'] as $field) {
+            $this->deleteFile($product->{$field});
+        }
+    }
+
+    protected function structuredData(Product $product): array
+    {
+        return [
+            '@context' => 'https://schema.org/',
+            '@type' => 'Product',
+            'name' => $product->name,
+            'image' => $product->image_url,
+            'description' => $product->seo_meta_description,
+            'sku' => 'PROD-' . $product->id,
+            'offers' => [
+                '@type' => 'Offer',
+                'url' => $product->product_url,
+                'priceCurrency' => 'INR',
+                'price' => $product->price,
+                'availability' => 'https://schema.org/InStock',
+                'seller' => [
+                    '@type' => 'Organization',
+                    'name' => config('seo.site_name'),
+                ],
+            ],
+        ];
+    }
+
+    protected function siteStructuredData(): array
+    {
+        return [
+            '@context' => 'https://schema.org/',
+            '@type' => 'WebSite',
+            'name' => config('seo.site_name'),
+            'url' => config('app.url', env('APP_URL', 'http://localhost')),
+            'potentialAction' => [
+                '@type' => 'SearchAction',
+                'target' => config('app.url', env('APP_URL', 'http://localhost')) . '/search?q={search_term_string}',
+                'query-input' => 'required name=search_term_string',
+            ],
+        ];
     }
 }
