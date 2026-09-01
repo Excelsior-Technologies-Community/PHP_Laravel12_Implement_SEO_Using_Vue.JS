@@ -25,7 +25,7 @@
             <p class="mb-1"><strong>Price:</strong> ₹{{ p.price }}</p>
 
             <router-link 
-              :to="'/customer/products/' + p.id"
+             :to="'/product/' + p.slug"
               class="btn btn-primary w-100 mt-2"
             >
               View
