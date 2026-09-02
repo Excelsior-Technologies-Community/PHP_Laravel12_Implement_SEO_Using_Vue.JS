@@ -16,12 +16,10 @@ class ProductController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    public function index()
+    public function index(Request $request)
     {
-        if (request()->wantsJson()) {
-            return response()->json(
-                Product::latest()->get()
-            );
+        if ($request->wantsJson()) {
+            return $this->productQuery($request)->get();
         }
 
         $seoService = app(\App\Services\SeoService::class);
@@ -33,7 +31,7 @@ class ProductController extends Controller
                 'seo.defaults.description',
                 'Best products online at the best prices.'
             ),
-            request()->fullUrl()
+            $request->fullUrl()
         );
 
         return view('app', [
@@ -42,6 +40,298 @@ class ProductController extends Controller
             'structuredData' => [
                 $this->siteStructuredData(),
             ],
+        ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | PRODUCT QUERY
+    |--------------------------------------------------------------------------
+    |
+    | New features:
+    | - Search
+    | - Sorting
+    | - Price filter
+    | - SEO score filter
+    | - Pagination
+    |
+    */
+
+    protected function productQuery(Request $request)
+    {
+        $query = Product::query();
+
+        /*
+        | Search
+        */
+        if ($request->filled('search')) {
+            $search = trim($request->input('search'));
+
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('slug', 'like', "%{$search}%")
+                    ->orWhere('size', 'like', "%{$search}%");
+            });
+        }
+
+        /*
+        | Minimum price
+        */
+        if ($request->filled('min_price')) {
+            $query->where(
+                'price',
+                '>=',
+                (float) $request->input('min_price')
+            );
+        }
+
+        /*
+        | Maximum price
+        */
+        if ($request->filled('max_price')) {
+            $query->where(
+                'price',
+                '<=',
+                (float) $request->input('max_price')
+            );
+        }
+
+        /*
+        | SEO STATUS FILTER
+        |
+        | Excellent = 90+
+        | Good = 70-89
+        | Needs Improvement = below 70
+        |
+        */
+
+        if ($request->filled('seo_status')) {
+            $status = $request->input('seo_status');
+
+            if ($status === 'excellent') {
+                $query->whereRaw(
+                    '(CASE
+                        WHEN seo_meta_title IS NOT NULL
+                        AND seo_meta_title != ""
+                        AND CHAR_LENGTH(seo_meta_title) BETWEEN 50 AND 60
+                        THEN 10 ELSE 0 END
+                    +
+                    CASE
+                        WHEN seo_meta_description IS NOT NULL
+                        AND seo_meta_description != ""
+                        AND CHAR_LENGTH(seo_meta_description) BETWEEN 120 AND 160
+                        THEN 10 ELSE 0 END
+                    +
+                    CASE
+                        WHEN seo_meta_keywords IS NOT NULL
+                        AND seo_meta_keywords != ""
+                        THEN 10 ELSE 0 END
+                    +
+                    CASE
+                        WHEN seo_canonical IS NOT NULL
+                        AND seo_canonical != ""
+                        THEN 10 ELSE 0 END
+                    +
+                    CASE
+                        WHEN slug IS NOT NULL
+                        AND slug != ""
+                        THEN 10 ELSE 0 END
+                    +
+                    CASE
+                        WHEN alt_text IS NOT NULL
+                        AND alt_text != ""
+                        THEN 10 ELSE 0 END
+                    +
+                    CASE
+                        WHEN og_meta_title IS NOT NULL
+                        AND og_meta_title != ""
+                        THEN 10 ELSE 0 END
+                    +
+                    CASE
+                        WHEN og_meta_description IS NOT NULL
+                        AND og_meta_description != ""
+                        THEN 10 ELSE 0 END
+                    +
+                    CASE
+                        WHEN og_image IS NOT NULL
+                        AND og_image != ""
+                        THEN 10 ELSE 0 END
+                    ) >= 9'
+                );
+            }
+
+            if ($status === 'good') {
+                $query->whereRaw(
+                    '(CASE
+                        WHEN seo_meta_title IS NOT NULL
+                        AND seo_meta_title != ""
+                        AND CHAR_LENGTH(seo_meta_title) BETWEEN 50 AND 60
+                        THEN 10 ELSE 0 END
+                    +
+                    CASE
+                        WHEN seo_meta_description IS NOT NULL
+                        AND seo_meta_description != ""
+                        AND CHAR_LENGTH(seo_meta_description) BETWEEN 120 AND 160
+                        THEN 10 ELSE 0 END
+                    +
+                    CASE
+                        WHEN seo_meta_keywords IS NOT NULL
+                        AND seo_meta_keywords != ""
+                        THEN 10 ELSE 0 END
+                    +
+                    CASE
+                        WHEN seo_canonical IS NOT NULL
+                        AND seo_canonical != ""
+                        THEN 10 ELSE 0 END
+                    +
+                    CASE
+                        WHEN slug IS NOT NULL
+                        AND slug != ""
+                        THEN 10 ELSE 0 END
+                    +
+                    CASE
+                        WHEN alt_text IS NOT NULL
+                        AND alt_text != ""
+                        THEN 10 ELSE 0 END
+                    +
+                    CASE
+                        WHEN og_meta_title IS NOT NULL
+                        AND og_meta_title != ""
+                        THEN 10 ELSE 0 END
+                    +
+                    CASE
+                        WHEN og_meta_description IS NOT NULL
+                        AND og_meta_description != ""
+                        THEN 10 ELSE 0 END
+                    +
+                    CASE
+                        WHEN og_image IS NOT NULL
+                        AND og_image != ""
+                        THEN 10 ELSE 0 END
+                    ) BETWEEN 7 AND 8'
+                );
+            }
+
+            if ($status === 'needs_improvement') {
+                $query->whereRaw(
+                    '(CASE
+                        WHEN seo_meta_title IS NOT NULL
+                        AND seo_meta_title != ""
+                        AND CHAR_LENGTH(seo_meta_title) BETWEEN 50 AND 60
+                        THEN 10 ELSE 0 END
+                    +
+                    CASE
+                        WHEN seo_meta_description IS NOT NULL
+                        AND seo_meta_description != ""
+                        AND CHAR_LENGTH(seo_meta_description) BETWEEN 120 AND 160
+                        THEN 10 ELSE 0 END
+                    +
+                    CASE
+                        WHEN seo_meta_keywords IS NOT NULL
+                        AND seo_meta_keywords != ""
+                        THEN 10 ELSE 0 END
+                    +
+                    CASE
+                        WHEN seo_canonical IS NOT NULL
+                        AND seo_canonical != ""
+                        THEN 10 ELSE 0 END
+                    +
+                    CASE
+                        WHEN slug IS NOT NULL
+                        AND slug != ""
+                        THEN 10 ELSE 0 END
+                    +
+                    CASE
+                        WHEN alt_text IS NOT NULL
+                        AND alt_text != ""
+                        THEN 10 ELSE 0 END
+                    +
+                    CASE
+                        WHEN og_meta_title IS NOT NULL
+                        AND og_meta_title != ""
+                        THEN 10 ELSE 0 END
+                    +
+                    CASE
+                        WHEN og_meta_description IS NOT NULL
+                        AND og_meta_description != ""
+                        THEN 10 ELSE 0 END
+                    +
+                    CASE
+                        WHEN og_image IS NOT NULL
+                        AND og_image != ""
+                        THEN 10 ELSE 0 END
+                    ) < 7'
+                );
+            }
+        }
+
+        /*
+        | Sorting
+        */
+
+        $sortBy = $request->input('sort_by', 'created_at');
+        $sortOrder = $request->input('sort_order', 'desc');
+
+        $allowedSorts = [
+            'name',
+            'price',
+            'created_at',
+            'updated_at',
+        ];
+
+        if (!in_array($sortBy, $allowedSorts, true)) {
+            $sortBy = 'created_at';
+        }
+
+        if (!in_array($sortOrder, ['asc', 'desc'], true)) {
+            $sortOrder = 'desc';
+        }
+
+        $query->orderBy($sortBy, $sortOrder);
+
+        return $query;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | JSON PRODUCT LIST
+    |--------------------------------------------------------------------------
+    */
+
+    public function jsonIndex(Request $request)
+    {
+        $perPage = (int) $request->input('per_page', 10);
+
+        if ($perPage < 1 || $perPage > 100) {
+            $perPage = 5;
+        }
+
+        $products = $this->productQuery($request)
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return response()->json($products);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | PRODUCT STATISTICS
+    |--------------------------------------------------------------------------
+    */
+
+    public function statistics()
+    {
+        $total = Product::count();
+
+        $average = Product::avg('price');
+        $highest = Product::max('price');
+        $lowest = Product::min('price');
+
+        return response()->json([
+            'total_products' => $total,
+            'average_price' => round((float) $average, 2),
+            'highest_price' => (float) ($highest ?? 0),
+            'lowest_price' => (float) ($lowest ?? 0),
         ]);
     }
 
@@ -56,19 +346,6 @@ class ProductController extends Controller
         $product = Product::where('slug', $slug)->firstOrFail();
 
         return $this->show($request, $product->id);
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | JSON PRODUCT LIST
-    |--------------------------------------------------------------------------
-    */
-
-    public function jsonIndex()
-    {
-        return response()->json(
-            Product::latest()->get()
-        );
     }
 
     /*
@@ -344,9 +621,7 @@ class ProductController extends Controller
                     '@type' => 'Organization',
 
                     'name' =>
-                    config(
-                        'seo.site_name'
-                    ),
+                    config('seo.site_name'),
                 ],
             ],
         ];
@@ -392,7 +667,7 @@ class ProductController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | NEW: BREADCRUMB JSON-LD
+    | BREADCRUMB JSON-LD
     |--------------------------------------------------------------------------
     */
 
@@ -415,21 +690,15 @@ class ProductController extends Controller
             'itemListElement' => [
                 [
                     '@type' => 'ListItem',
-
                     'position' => 1,
-
                     'name' => 'Home',
-
                     'item' => $baseUrl,
                 ],
 
                 [
                     '@type' => 'ListItem',
-
                     'position' => 2,
-
                     'name' => 'Products',
-
                     'item' =>
                     $baseUrl
                         . '/customer/products',
@@ -437,13 +706,9 @@ class ProductController extends Controller
 
                 [
                     '@type' => 'ListItem',
-
                     'position' => 3,
-
                     'name' => $product->name,
-
-                    'item' =>
-                    $product->product_url,
+                    'item' => $product->product_url,
                 ],
             ],
         ];
